@@ -55,3 +55,5 @@ label{display:block;font-size:13px;color:var(--mut);margin-bottom:10px}
 
 .locked nav,.locked .fab,.locked #qc-fab{display:none}.lockwrap{display:grid;place-items:center;min-height:60vh}.lockcard{max-width:400px;width:100%}.lockcard label{display:block;margin:10px 0;font-size:13px}.lockcard input{display:block;width:100%;margin-top:4px}
 .stgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px;margin-bottom:8px}.stcell{border:1px solid var(--line);border-radius:8px;padding:8px 10px}.stcell.wide{grid-column:1/-1}.stl{font-size:12px;opacity:.7;text-transform:uppercase;letter-spacing:.04em}.stv{font-size:20px;margin-top:2px}.stn,.stc{font-size:12px;opacity:.7;display:block;margin-top:2px}.unsure{opacity:.65;font-style:italic}.stul{margin:4px 0 0;padding-left:18px}
+.pill.bz-urgent{background:#fde2e2;color:#9b1c1c;border-color:#f3b4b4}
+.stgrid select{margin-top:4px}
