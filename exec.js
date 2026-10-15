@@ -96,10 +96,12 @@ async function doLogin(f){const er=$('#lerr');er.textContent='Signing in…';
   catch(x){er.textContent=x.status==429?'Too many attempts. Wait 15 minutes.':x.status==401||x.status==400?'Wrong email or password.':'Could not reach the server.'}}
 document.addEventListener('submit',e=>{if(e.target.id=='lockform'){e.preventDefault();doLogin(e.target)}});
 function render(){if(!S.authed){document.body.classList.add('locked');$('#nav').innerHTML='';$('#who').innerHTML='';$('#main').innerHTML=!S.checked?'<div class="lockwrap"><p class="sub">Loading…</p></div>':!S.online?`<div class="lockwrap"><div class="notice">${esc(S.err)}</div></div>`:lockView();return}
- document.body.classList.remove('locked');const t=(location.hash.replace(/^#\/?/,'').split('/')[0])||NAV[0][0],v=NAV.find(n=>n[0]==t)||NAV[0];
- $('#nav').innerHTML=NAV.map(n=>`<a href="#/${n[0]}" class="${n[0]==v[0]?'on':''}" ${n[0]==v[0]?'aria-current="page"':''}>${esc(n[1])}</a>`).join('');
- $('#who').innerHTML=`Signed in${S.user?' · '+esc(S.user):''}`;
- $('#main').innerHTML=v[2]()}
+ document.body.classList.remove('locked');const t=(location.hash.replace(/^#\/?/,'').split('/')[0])||'home',v=NAV.find(n=>n[0]==t)||NAV.find(n=>n[0]=='home')||NAV[0];
+ $('#nav').innerHTML=`<a href="#/home" class="${v[0]=='home'?'on':''}" ${v[0]=='home'?'aria-current="page"':''}>Home</a>`;
+ $('#who').innerHTML=`${S.user?esc(S.user)+' ':''}<button class="btn alt sm" data-act="logout">Sign out</button>`;
+ $('#main').innerHTML=v[2]()+moreNav(v[0])}
+function moreNav(cur){const L=NAV.filter(n=>n[0]!='home'&&n[0]!=cur);return `<details class="more-nav" id="morenav" ${S.moreOpen?'open':''}><summary>More</summary><div class="more-links">${L.map(n=>`<a href="#/${esc(n[0])}">${esc(n[1])}</a>`).join('')}<a href="https://drive.google.com/file/d/1NrbRN8bJYOD6847CmxC5q5E0Lzawg4JO/view?usp=drivesdk" target="_blank" rel="noopener">Executive demo video</a></div></details>`}
+document.addEventListener('toggle',ev=>{if(ev.target.id=='morenav')S.moreOpen=ev.target.open},true);
 function login(note){if($('#lg'))return;const d=document.createElement('div');d.className='modal';d.id='lg';
  d.innerHTML=`<form role="dialog" aria-label="Sign in"><img src="launchriot-logo.png" alt="LaunchRiot" style="height:44px"><h2 style="margin-top:12px">Sign in</h2><label>Email<input name="email" type="email" required autocomplete="username"></label><label>Password<input name="password" type="password" required autocomplete="current-password"></label><p id="lerr" class="sm" style="color:#b00;min-height:18px">${esc(note||'')}</p><div class="row"><button class="btn">Sign in</button><button type="button" class="btn alt" id="lx">Not now</button></div></form>`;
  document.body.appendChild(d);d.querySelector('input').focus();d.querySelector('#lx').onclick=()=>d.remove();
