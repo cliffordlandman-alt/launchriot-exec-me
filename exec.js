@@ -111,7 +111,7 @@ async function doLogin(f){const er=$('#lerr');er.textContent='Signing in…';
   catch(x){er.textContent=x.status==429?'Too many attempts. Wait 15 minutes.':x.status==401||x.status==400?'Wrong email or password.':'Could not reach the server.'}}
 document.addEventListener('submit',e=>{if(e.target.id=='lockform'){e.preventDefault();doLogin(e.target)}});
 function render(){if(!S.authed){document.body.classList.add('locked');$('#nav').innerHTML='';$('#who').innerHTML='';$('#main').innerHTML=!S.checked?'<div class="lockwrap"><p class="sub">Loading…</p></div>':!S.online?`<div class="lockwrap"><div class="notice">${esc(S.err)}</div></div>`:lockView();return}
- document.body.classList.remove('locked');const t=(location.hash.replace(/^#\/?/,'').split('/')[0])||'overview',v=NAV.find(n=>n[0]==t)||NAV[0];
+ document.body.classList.remove('locked');const t=(location.hash.replace(/^#\/?/,'').split('/')[0])||NAV[0][0],v=NAV.find(n=>n[0]==t)||NAV[0];
  $('#nav').innerHTML=NAV.map(n=>`<a href="#/${n[0]}" class="${n[0]==v[0]?'on':''}" ${n[0]==v[0]?'aria-current="page"':''}>${esc(n[1])}</a>`).join('');
  $('#who').innerHTML=`Signed in${S.user?' · '+esc(S.user):''}`;
  $('#main').innerHTML=v[2]()}

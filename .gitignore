@@ -1,3 +1,5 @@
 *.json
 .env
 seed.py
+status-seed.py
+status.json

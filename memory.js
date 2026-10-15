@@ -2,7 +2,7 @@
 (function(){'use strict';const W=window.WN,{S,api,esc,toast}=W;
 S.mem=[];S.memQ='';S.memRes=null;S.memKind='';
 const K={style:'Communication style',relationship:'Relationship',standing_instruction:'Standing instruction',decision_ref:'Past decision'};
-W.onLoad(async soft=>{const r=await soft('/memory');if(r)S.mem=W.arr(r)});
+W.onLoad(async soft=>{const r=await soft('/memory');if(r)S.mem=W.arr(r).filter(m=>!(Array.isArray(m.tags)&&m.tags.indexOf('status')>=0))});
 const tags=m=>Array.isArray(m.tags)?m.tags:[];
 function row(m){return `<div class="item"><div class="t"><span class="pill">${esc(K[m.kind]||m.kind)}</span>${esc(m.title)}</div>${m.body?`<div class="why" style="white-space:pre-wrap">${esc(m.body)}</div>`:''}${tags(m).length?`<div class="mut sm">${tags(m).map(t=>'#'+esc(t)).join(' ')}</div>`:''}<div class="mut sm">Updated ${esc(W.dl(m.updated_at||m.created_at))}</div>
  <div class="row" style="margin-top:6px"><button class="btn alt sm" data-mem-edit="${esc(m.id)}">Edit</button><button class="btn alt sm" data-mem-del="${esc(m.id)}" aria-label="Delete ${esc(m.title)}">Delete</button></div></div>`}
