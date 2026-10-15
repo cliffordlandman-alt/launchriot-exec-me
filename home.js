@@ -16,7 +16,7 @@ const ME=/clifford|landman/i;
 const mine=t=>{const o=[t.owner].concat((t.assigned_staff||[]).map(a=>a&&(typeof a=='object'?(a.name||'')+' '+(a.email||''):a)));return o.some(v=>v&&ME.test(String(v)))};
 const hasOwner=t=>!!(t.owner||(t.assigned_staff&&t.assigned_staff.length));
 function split(){const H=[],M=[],tk=W.todayK();
- const dueWhy=k=>k<tk?'Overdue':k==tk?'Due today':'';
+ const dueWhy=k=>!k?'':k<tk?'Overdue':k==tk?'Due today':'';
  (S.decisions||[]).filter(d=>d.status!='decided').forEach(d=>{const k=dKey(d.due),own=!d.owner||ME.test(String(d.owner)),w=dueWhy(k);
   const it={k:'Decision',t:d.title||'(untitled)',due:k,p:1,go:'#/decisions'};
   if(own&&w){it.why=w+' · open decision in your register';H.push(it)}else{it.why=!own?'Owned by '+d.owner+', not you':k?'Not due yet':'No deadline set';M.push(it)}});
