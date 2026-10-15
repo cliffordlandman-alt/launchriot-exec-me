@@ -1,4 +1,4 @@
-// VIP relationship manager: /vips, /vips/:id/history, /vips/:id/notes. Follow-up reminders are captured tasks (/capture). Nothing is sent.
+// VIP relationship manager: /vips, /vips/:id/history, /vips/:id/notes. Nothing is sent.
 (function(){'use strict';const W=window.WN,{S,api,esc,toast}=W;
 S.vips=[];S.vipSel=null;S.vipHist=null;
 const KIND={client:'Client',supplier:'Supplier',colleague:'Colleague'};
@@ -19,11 +19,10 @@ function thread(t){const a=t.from_name||(t.from&&typeof t.from=='object'?t.from.
  return `<div class="item"><div class="t">${esc(t.subject||'(no subject)')}</div><div class="mut sm">${esc(a)}${at?' · '+esc(W.dl(at))+' '+esc(W.tm(at)):''}</div>${l?`<a href="${esc(l)}" target="_blank" rel="noopener noreferrer">Open in Gmail ↗</a>`:''}</div>`}
 function detail(){const v=S.vips.find(x=>x.id==S.vipSel);if(!v)return '';const h=S.vipHist&&S.vipHist.vip&&S.vipHist.vip.id==v.id?S.vipHist:null;
  if(!h)return `<div class="card"><h2>${esc(v.name)}</h2><div class="empty">Loading history…</div></div>`;
- const oc=h.open_commitments||{},dec=oc.decisions||[],tk=oc.captured_tasks||[],notes=h.notes||[],th=h.threads||[];
+ const oc=h.open_commitments||{},dec=oc.decisions||[],tk=[],notes=h.notes||[],th=h.threads||[];
  return `<div class="card" id="vipdetail"><div class="row" style="justify-content:space-between"><h2 style="margin:0">${esc(v.name)} <span class="pill">${esc(KIND[v.kind]||'VIP')}</span></h2><button class="btn alt sm" data-vip-close>Close</button></div><div class="mut sm">${esc(who(v))}${v.org?' · '+esc(v.org):''}</div>
  <div class="grid2" style="margin-top:14px"><div><h3>Contact history (last ${th.length})</h3>${th.length?th.map(thread).join(''):'<div class="empty">No mail to or from this address in the synced window (last 14 days).</div>'}</div>
- <div><h3>Open commitments</h3>${dec.length||tk.length?dec.map(d=>`<div class="item"><span class="pill warn">Decision</span>${esc(d.title||'')}</div>`).join('')+tk.map(t=>`<div class="item"><span class="pill warn">Task</span>${esc(t.text||t.title||'')}${t.due?` <span class="mut sm">· due ${esc(String(t.due).slice(0,10))}</span>`:''}</div>`).join(''):'<div class="empty">None linked.</div>'}
- <h3 style="margin-top:16px">Follow-up reminder</h3><form id="vipfu" data-id="${esc(v.id)}" class="row"><input type="date" name="due" required aria-label="Follow-up date" style="width:auto"><button class="btn sm">Add reminder</button></form><div class="mut sm">Creates a task in Capture. Nothing is sent to ${esc(v.name)}.</div></div></div>
+ <div><h3>Open commitments</h3>${dec.length||tk.length?dec.map(d=>`<div class="item"><span class="pill warn">Decision</span>${esc(d.title||'')}</div>`).join('')+tk.map(t=>`<div class="item"><span class="pill warn">Task</span>${esc(t.text||t.title||'')}${t.due?` <span class="mut sm">· due ${esc(String(t.due).slice(0,10))}</span>`:''}</div>`).join(''):'<div class="empty">None linked.</div>'} </div></div>
  <h3 style="margin-top:16px">Notes (${notes.length})</h3>${notes.length?notes.map(n=>`<div class="item row" style="justify-content:space-between;flex-wrap:nowrap"><div style="min-width:0;overflow-wrap:anywhere">${esc(n.text)}<div class="mut sm">${esc(W.dl(n.created_at))}</div></div><button class="btn alt sm" data-vip-ndel="${esc(n.id)}" aria-label="Delete note">Delete</button></div>`).join(''):'<div class="empty">No notes yet.</div>'}
  <form id="vipnote" data-id="${esc(v.id)}" class="row" style="margin-top:8px;flex-wrap:nowrap"><input name="text" required maxlength="500" placeholder="Add a note" aria-label="New note"><button class="btn sm">Add</button></form></div>`}
 function view(){const vm=S.mail.filter(m=>m.vip);
@@ -46,6 +45,5 @@ document.addEventListener('submit',async e=>{const f=e.target;
  if(f.id=='vipform'){e.preventDefault();const id=f.dataset.id,a=f.addr.value.trim().toLowerCase();const b={name:f.name.value.trim(),org:f.org.value.trim(),kind:f.kind.value,note:f.note.value.trim()};
   if(f.by.value=='email'){if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(a))return toast('Enter a valid email address');b.email=a;if(id)b.domain=null}else{b.domain=a.replace(/^@/,'');if(!/^[^@\s]+\.[^@\s]+$/.test(b.domain))return toast('Enter a domain like firm.com');if(id)b.email=null}
   f.closest('.modal').remove();await call(id?'/vips/'+encodeURIComponent(id):'/vips',id?'PUT':'POST',b,id?'Saved':'VIP added')}
- if(f.id=='vipnote'){e.preventDefault();const t=f.text.value.trim();if(!t)return;await call('/vips/'+encodeURIComponent(f.dataset.id)+'/notes','POST',{text:t},'Note added')}
- if(f.id=='vipfu'){e.preventDefault();const v=byId(f.dataset.id);if(!v)return;await call('/capture','POST',{type:'task',text:'Follow up with '+v.name+(v.org?' ('+v.org+')':''),due:f.due.value},'Follow-up added to Capture')}});
+ if(f.id=='vipnote'){e.preventDefault();const t=f.text.value.trim();if(!t)return;await call('/vips/'+encodeURIComponent(f.dataset.id)+'/notes','POST',{text:t},'Note added')}});
 })();
