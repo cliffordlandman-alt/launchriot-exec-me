@@ -5,9 +5,15 @@ const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;'
 const $=s=>document.querySelector(s);
 const HOOKS=[];const S={checked:false,authed:false,online:true,loaded:false,err:'',conn:[],mail:[],cal:[],staff:[],drafts:[],user:null,syncedAt:null,ans:null};
 const arr=x=>Array.isArray(x)?x:(x&&(x.items||x.data||x.connections))||[];
-async function api(p,o){o=o||{};const r=await fetch(API_BASE+p,{...o,credentials:'include',headers:o.body?{'Content-Type':'application/json'}:{}});
+const TK='lr_session';
+const getTok=()=>{try{return localStorage.getItem(TK)||''}catch(e){return ''}};
+const setTok=t=>{try{t?localStorage.setItem(TK,t):localStorage.removeItem(TK)}catch(e){}};
+(function(){try{const m=/[#&?\/](?:t|s)=([^&]+)/.exec(location.hash||'');if(m){let t=m[1];try{t=decodeURIComponent(t)}catch(e){}setTok(t);history.replaceState(null,'',location.pathname+location.search)}}catch(e){}})();
+async function api(p,o){o=o||{};const h=o.body?{'Content-Type':'application/json'}:{};const tk=getTok();if(tk)h['Authorization']='Bearer '+tk;
+ const r=await fetch(API_BASE+p,{...o,credentials:'include',headers:h});
+ if(r.status==401&&tk&&p!='/auth/login')setTok('');
  const ct=r.headers.get('content-type')||'',b=ct.includes('json')?await r.json().catch(()=>null):null;const e=new Error('HTTP '+r.status);e.status=r.status;
- if(!r.ok)throw e;return b}
+ if(!r.ok)throw e;if(p=='/auth/login'&&b){const t=b.token||b.session||b.session_token||(b.data&&(b.data.token||b.data.session));if(typeof t=='string'&&t)setTok(t)}return b}
 const fmt=(iso,k)=>iso?new Intl.DateTimeFormat('en-GB',{timeZone:TZ,...k}).format(new Date(iso)):'';
 const dkey=iso=>iso?new Intl.DateTimeFormat('en-CA',{timeZone:TZ}).format(new Date(iso)):'';
 const todayK=()=>dkey(new Date().toISOString());
@@ -111,7 +117,7 @@ function login(note){if($('#lg'))return;const d=document.createElement('div');d.
 // ---- events ----
 document.addEventListener('click',async e=>{const b=e.target.closest('[data-act],[data-ask]');if(!b)return;
  if(b.dataset.act=='login')login();
- if(b.dataset.act=='logout'){try{await api('/auth/logout',{method:'POST'})}catch(x){}Object.assign(S,{decisions:[],authed:false,loaded:false,mail:[],cal:[],staff:[],drafts:[],conn:[],user:null,ans:null});render()}
+ if(b.dataset.act=='logout'){try{await api('/auth/logout',{method:'POST'})}catch(x){}setTok('');Object.assign(S,{decisions:[],authed:false,loaded:false,mail:[],cal:[],staff:[],drafts:[],conn:[],user:null,ans:null});render()}
  if(b.dataset.ask){S.ans=answer(b.dataset.ask);render();const a=$('#ans');a&&a.scrollIntoView({block:'nearest'})}});
 document.addEventListener('keydown',e=>{if(e.key=='Escape'){document.querySelectorAll('.modal').forEach(m=>m.remove())}});
 addEventListener('hashchange',()=>{render();$('#main').focus({preventScroll:true});scrollTo(0,0)});
