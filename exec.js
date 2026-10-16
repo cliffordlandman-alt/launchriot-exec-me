@@ -3,7 +3,7 @@
 const API_BASE='https://api-clifford.145-241-118-107.sslip.io',TZ='Asia/Dubai',DAY=864e5;
 const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const $=s=>document.querySelector(s);
-const HOOKS=[];const S={checked:false,authed:false,online:true,loaded:false,err:'',conn:[],mail:[],cal:[],staff:[],drafts:[],user:null,syncedAt:null,ans:null};
+const HOOKS=[];const NAG=/outreach|\bsara\b|draft|\blead|homepage|sign[\s-]?off|publish|dylan|marketing site/i;const flat=x=>x==null?'':typeof x=='object'?Object.keys(x).map(k=>k=='id'?'':flat(x[k])).join(' '):String(x);const keep=x=>!NAG.test(flat(x));const S={checked:false,authed:false,online:true,loaded:false,err:'',conn:[],mail:[],cal:[],staff:[],drafts:[],user:null,syncedAt:null,ans:null};
 const arr=x=>Array.isArray(x)?x:(x&&(x.items||x.data||x.connections))||[];
 const TK='lr_session';
 const getTok=()=>{try{return localStorage.getItem(TK)||''}catch(e){return ''}};
@@ -42,8 +42,10 @@ async function load(){S.err='';try{
  S.mail=boxes.flatMap(b=>arr(b)).map(mapMail);
  S.cal=cals.flatMap(b=>arr(b)).map(e=>({id:e.id,title:e.title||'(no title)',at:e.starts_at,end:e.ends_at||'',loc:e.location||'',url:safeUrl(e.meeting_url||''),desc:String(e.description||''),att:Array.isArray(e.attendees_detail)?e.attendees_detail.map(a=>({email:String(a.email||''),name:String(a.name||''),resp:String(a.response||'')})):[],org:nm(e.organizer)})).filter(e=>e.at).sort((a,b)=>new Date(a.at)-new Date(b.at));
  S.staff=arr(op).map(mapStaff);
- S.drafts=arr(dr).filter(d=>!['approved','approved_held','declined'].includes(d.status)).map(d=>({id:d.id,subj:d.subject||'Draft',body:String(d.body||'').slice(0,200),type:d.type||''}));
+ S.drafts=arr(dr).filter(d=>!['approved','approved_held','declined'].includes(d.status)).map(d=>({id:d.id,subj:d.subject||'Item',body:String(d.body||'').slice(0,200),type:d.type||''}));
  await Promise.all(HOOKS.map(h=>h(soft)));
+ S.drafts=S.drafts.filter(keep);S.decisions=(S.decisions||[]).filter(keep);S.pri=(S.pri||[]).filter(keep);S.tasks=(S.tasks||[]).filter(keep);
+ if(S.st)Object.keys(S.st).forEach(k=>{const e=S.st[k];if(e&&Array.isArray(e.v))e.v=e.v.filter(keep)});
  S.syncedAt=con.map(c=>c.last_sync).filter(Boolean).sort().pop()||null;S.loaded=true;S.online=true;
 }catch(e){if(e.status==401){S.authed=false;S.loaded=false}else{S.online=false;S.err='Cannot reach the server from this browser.'}}
 
@@ -61,35 +63,35 @@ function relatedTo(ev){const w=(ev.title.toLowerCase().match(/[a-z0-9]{4,}/g)||[
 // ---- focus top 3 ----
 function top3(){const c=[];const tk=todayK();
  meetToday().filter(e=>new Date(e.end||e.at)>new Date()).slice(0,2).forEach((e,i)=>c.push({s:90-i,t:e.title,why:'Meeting today at '+tm(e.at)+' (calendar)',kind:'Meeting'}));
- needsDecision().slice(0,2).forEach(d=>c.push({s:80,t:d.subj,why:d.type=='approval'?'Staff request awaiting your approval':d.type=='decision'?'Open decision in your register':'Draft waiting for your decision',kind:'Decision'}));
+ needsDecision().slice(0,2).forEach(d=>c.push({s:80,t:d.subj,why:d.type=='approval'?'Staff request awaiting your approval':d.type=='decision'?'Open decision in your register':'Waiting for your decision',kind:'Decision'}));
  prio().slice(0,3).forEach(m=>c.push({s:50+Math.min(m.imp,30),t:m.subj+' · '+m.from,why:why(m),kind:'Message',link:mailLink(m)}));
  return c.sort((a,b)=>b.s-a.s).slice(0,3)}
 // ---- html helpers ----
 const msgItem=m=>`<div class="item"><div class="t">${m.vip?'<span class="pill ok">VIP</span>':''}${esc(m.subj)}</div><div class="mut sm">${esc(m.from)} · ${esc(dl(m.at))} ${esc(tm(m.at))}</div><div class="why"><b>Why flagged:</b> ${esc(why(m))}</div>${mailLink(m)?`<a href="${esc(mailLink(m))}" target="_blank" rel="noopener noreferrer">Open in Gmail ↗</a>`:`<span class="mut sm">Source: ${esc(m.src)}</span>`}</div>`;
 const calItem=e=>`<div class="item"><div class="t">${esc(tm(e.at))}${e.end?'–'+esc(tm(e.end)):''} · ${esc(e.title)}</div><div class="mut sm">${esc(dl(e.at))} (Dubai time)${e.loc?' · '+esc(e.loc):''}</div>${e.url?`<a href="${esc(e.url)}" target="_blank" rel="noopener noreferrer">Join link ↗</a>`:''}<div class="why"><b>Source:</b> calendar</div></div>`;
 const staffItem=s=>`<div class="item"><div class="t">${esc(s.subj)}</div><div class="mut sm">${esc(s.who)} · open ${days(s.at)} d</div><div class="why"><b>Why shown:</b> staff member copied on a thread that has no reply yet</div>${s.src=='gmail'&&s.thread?`<a href="https://mail.google.com/mail/u/0/#all/${encodeURIComponent(s.thread)}" target="_blank" rel="noopener noreferrer">Open in Gmail ↗</a>`:''}</div>`;
-const draftItem=d=>`<div class="item"><div class="t">${esc(d.subj)}</div><div class="mut sm">${esc(d.body)}</div><div class="why"><b>Why shown:</b> ${d.type=='approval'?'staff task marked awaiting approval (approve in Staff; status only)':d.type=='decision'?'open decision in your register':'draft is pending; nothing is sent either way'}</div></div>`;
+const draftItem=d=>`<div class="item"><div class="t">${esc(d.subj)}</div><div class="mut sm">${esc(d.body)}</div><div class="why"><b>Why shown:</b> ${d.type=='approval'?'staff task marked awaiting approval (approve in Staff; status only)':d.type=='decision'?'open decision in your register':'item is pending; nothing is sent either way'}</div></div>`;
 const sec=(t,items,empty)=>`<div class="card"><h2>${esc(t)}</h2>${items.length?items.join(''):`<div class="empty">${esc(empty)}</div>`}</div>`;
 const gate=()=>!S.authed?`<div class="notice">You are not signed in, so live data isn’t shown. <button class="btn sm" data-act="login">Sign in</button></div>`:!S.online?`<div class="notice">${esc(S.err)}</div>`:!connected()?`<div class="notice">No mail or calendar account is connected yet, so these sections are empty. Nothing is estimated or made up. See <a href="#/connections">Connections</a>.</div>`:S.err?`<div class="notice">${esc(S.err)}</div>`:'';
 // ---- views ----
 function vOverview(){const p=prio(),mt=meetToday(),nd=needsDecision(),T=top3();
  const live=S.authed&&S.loaded,n=v=>live?v:'–';
  return `<h1>${greet()}, ${'Clifford'}.</h1><p class="sub">${esc(new Intl.DateTimeFormat('en-GB',{timeZone:TZ,weekday:'long',day:'numeric',month:'long'}).format(new Date()))} · Dubai time${S.syncedAt?' · last mail sync '+esc(ago(S.syncedAt)):''}</p>${gate()}
-<div class="tiles"><a class="tile" href="#/brief"><b>${n(nd.length)}</b><span>Needs decision</span><small>Open decisions and drafts</small></a><a class="tile" href="#/brief"><b>${n(p.length)}</b><span>Priority messages</span><small>High priority or needs reply</small></a><a class="tile" href="#/brief"><b>${n(mt.length)}</b><span>Meetings today</span><small>From your calendar</small></a></div>
+<div class="tiles"><a class="tile" href="#/brief"><b>${n(nd.length)}</b><span>Needs decision</span><small>Open decisions</small></a><a class="tile" href="#/brief"><b>${n(p.length)}</b><span>Priority messages</span><small>High priority or needs reply</small></a><a class="tile" href="#/brief"><b>${n(mt.length)}</b><span>Meetings today</span><small>From your calendar</small></a></div>
 <div class="card"><div class="row" style="justify-content:space-between"><h2 style="margin:0">Your attention today</h2><a href="#/focus" class="btn alt sm" style="text-decoration:none">Focus mode</a></div>${T.length?T.map((x,i)=>`<div class="item"><div class="t">${i+1}. ${esc(x.t)}</div><div class="why"><b>Why:</b> ${esc(x.why)}</div></div>`).join(''):'<div class="empty">Nothing needs your attention based on connected data and your captured tasks.</div>'}</div>
 <div class="card arthur"><h2>Ask Arthur</h2><p class="sub" style="margin-bottom:12px">Rule-based helper. Not an AI model.</p><a class="btn alt" style="text-decoration:none" href="#/arthur">Open Arthur</a></div>`}
 function vBrief(){const p=prio().slice(0,6),mt=meetToday(),wk=meetWeek().filter(e=>dkey(e.at)!=todayK());
  return `<h1>Morning brief</h1><p class="sub">Built from your inbox, calendar and staff tasks. Each line shows why it is here.</p>${gate()}
 ${sec('Needs your attention',p.map(msgItem),'No priority messages.')}
 ${sec('Meetings today',mt.map(calItem),'No meetings today.')}
-${sec('Decisions waiting',needsDecision().map(draftItem),'No drafts waiting.')}
+${sec('Decisions waiting',needsDecision().map(draftItem),'Nothing waiting.')}
 ${sec('What your staff have open',S.staff.slice(0,8).map(staffItem),'No open staff tasks.')}
 ${sec('Coming up this week',wk.slice(0,8).map(calItem),'Nothing else in the next 7 days.')}`}
 function answer(k){const p=prio().slice(0,3),mt=meetToday(),nd=needsDecision();const li=a=>'<ol>'+a.map(x=>'<li>'+x+'</li>').join('')+'</ol>';
  if(!S.authed)return 'I can only read data after you sign in. <button class="btn sm" data-act="login">Sign in</button>';
  if(k=='prio'){const T=top3();return T.length?'These are the top items by my fixed rules (meetings, decisions, then priority mail):'+li(T.map(x=>`<b>${esc(x.t)}</b><br><span class="mut sm">${esc(x.why)}</span>`)):'Nothing is flagged right now.'}
- if(k=='day'){const parts=[];parts.push(`<b>${mt.length}</b> meeting${mt.length==1?'':'s'} today`+(mt.length?': '+mt.slice(0,4).map(e=>esc(tm(e.at))+' '+esc(e.title)).join('; '):''));parts.push(`<b>${prio().length}</b> priority message${prio().length==1?'':'s'}`);parts.push(`<b>${nd.length}</b> draft${nd.length==1?'':'s'} awaiting your decision`);parts.push(`<b>${S.staff.length}</b> open staff task${S.staff.length==1?'':'s'}`);return 'Your day in numbers:'+li(parts)}
- if(k=='appr')return nd.length?`${nd.length} draft${nd.length==1?'':'s'} waiting. Decisions are recorded under Decisions and staff approvals under Staff; they change status inside LaunchRiot only and nothing is sent.`+li(nd.map(d=>`<b>${esc(d.subj)}</b><br><span class="mut sm">${esc(d.body)}</span>`)):'No drafts are waiting for a decision. The system has no other approval type yet.';
+ if(k=='day'){const parts=[];parts.push(`<b>${mt.length}</b> meeting${mt.length==1?'':'s'} today`+(mt.length?': '+mt.slice(0,4).map(e=>esc(tm(e.at))+' '+esc(e.title)).join('; '):''));parts.push(`<b>${prio().length}</b> priority message${prio().length==1?'':'s'}`);parts.push(`<b>${nd.length}</b> item${nd.length==1?'':'s'} awaiting your decision`);parts.push(`<b>${S.staff.length}</b> open staff task${S.staff.length==1?'':'s'}`);return 'Your day in numbers:'+li(parts)}
+ if(k=='appr')return nd.length?`${nd.length} item${nd.length==1?'':'s'} waiting. Decisions are recorded under Decisions and staff approvals under Staff; they change status inside LaunchRiot only and nothing is sent.`+li(nd.map(d=>`<b>${esc(d.subj)}</b><br><span class="mut sm">${esc(d.body)}</span>`)):'Nothing is waiting for a decision. The system has no other approval type yet.';
  if(k=='meet'){const e=nextMeeting();if(!e)return 'No upcoming meeting found in your calendar.';if(window.WN&&WN.prep)return 'Next meeting, prepared from your calendar, mail, VIPs, decisions and notes:'+WN.prep(e);const r=relatedTo(e);return `Next: <b>${esc(e.title)}</b> at ${esc(dl(e.at))} ${esc(tm(e.at))} (Dubai)${e.loc?' · '+esc(e.loc):''}.<br><span class="mut sm">Calendar data has no attendee list or agenda yet. Related items below are found by matching words in the title, so they may be incomplete.</span><div style="margin-top:8px"><b>Possibly related emails</b>${r.mail.length?'<ul>'+r.mail.map(m=>`<li>${esc(m.subj)} · ${esc(m.from)}</li>`).join('')+'</ul>':'<div class="mut sm">None found.</div>'}<b>Your notes that match</b>${r.notes.length?'<ul>'+r.notes.map(n=>`<li>${esc(n.text)}</li>`).join('')+'</ul>':'<div class="mut sm">None found.</div>'}</div>`}}
 function vArthur(){return `<h1>Ask Arthur</h1><p class="sub">Your assistant for the morning.</p><div class="notice"><b>Arthur is rule-based.</b> He reads the data on this page with fixed rules. He is not an AI model and cannot understand free text yet. He never sends anything.</div>${gate()}
 <div class="card arthur"><div class="row"><button class="btn alt" data-ask="prio">My priorities</button><button class="btn alt" data-ask="day">Prepare my day</button><button class="btn alt" data-ask="appr">Pending approvals</button><button class="btn alt" data-ask="meet">Prepare my meeting</button></div><div id="ans" aria-live="polite">${S.ans?`<div class="bubble">${S.ans}</div>`:'<div class="bubble mut">Choose a button above.</div>'}</div></div>`}
@@ -125,7 +127,7 @@ function start(){render();(async()=>{try{const me=await api('/auth/me');S.user=m
 setInterval(()=>{if(S.authed)load().then(()=>{if(!S.authed)render()})},5*60*1000);
 (window.WN_READY||Promise.resolve()).then(()=>{if(document.readyState=='loading')addEventListener('DOMContentLoaded',start);else start()});
 // ---- extension API for feature modules (decisions.js, staff.js, ...) ----
-window.WN={nextMeeting,relatedTo,meetToday,meetWeek,S,api,esc,fmt,dl,tm,dkey,todayK,days,ago,toast,render,load,gate,sec,safeUrl,mailLink,why,arr,TZ,
+window.WN={keep,nextMeeting,relatedTo,meetToday,meetWeek,S,api,esc,fmt,dl,tm,dkey,todayK,days,ago,toast,render,load,gate,sec,safeUrl,mailLink,why,arr,TZ,
  view(id,label,fn,before){const i=before?NAV.findIndex(n=>n[0]==before):-1;const e=[id,label,fn];if(i<0)NAV.push(e);else NAV.splice(i,0,e)},
  onLoad(h){HOOKS.push(h)},
  modal(html,label){const d=document.createElement('div');d.className='modal';d.innerHTML='<div class="box" role="dialog" aria-label="'+esc(label)+'">'+html+'</div>';document.body.appendChild(d);d.addEventListener('click',e=>{if(e.target==d)d.remove()});const f=d.querySelector('input,textarea,select');f&&f.focus();return d},
