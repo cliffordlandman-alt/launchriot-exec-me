@@ -3,7 +3,7 @@
 const API_BASE='https://api-clifford.145-241-118-107.sslip.io',TZ='Asia/Dubai',DAY=864e5;
 const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const $=s=>document.querySelector(s);
-const HOOKS=[];const NAG=/outreach|\bsara\b|draft|\blead|homepage|sign[\s-]?off|publish|dylan|marketing site/i;const flat=x=>x==null?'':typeof x=='object'?Object.keys(x).map(k=>k=='id'?'':flat(x[k])).join(' '):String(x);const keep=x=>!NAG.test(flat(x));const S={checked:false,authed:false,online:true,loaded:false,err:'',conn:[],mail:[],cal:[],staff:[],drafts:[],user:null,syncedAt:null,ans:null};
+const HOOKS=[];const NAG=/outreach|\bsara\b|draft|\blead|homepage|sign[\s-]?off|publish|dylan|marketing site|s-class|s class|limo|limousine|\b16 cars|\bcars?\b|car hire|chauffeur|23 oct\w*[^.]{0,40}supplier|supplier[^.]{0,40}23 oct/i;const flat=x=>x==null?'':typeof x=='object'?Object.keys(x).map(k=>k=='id'?'':flat(x[k])).join(' '):String(x);const keep=x=>!NAG.test(flat(x));const S={checked:false,authed:false,online:true,loaded:false,err:'',conn:[],mail:[],cal:[],staff:[],drafts:[],user:null,syncedAt:null,ans:null};
 const arr=x=>Array.isArray(x)?x:(x&&(x.items||x.data||x.connections))||[];
 const TK='lr_session';
 const getTok=()=>{try{return localStorage.getItem(TK)||''}catch(e){return ''}};
