@@ -33,7 +33,7 @@ const isPriority=m=>!m.replied&&(m.pri||m.flag);
 function why(m){const r=[];if(m.pri)r.push('marked high priority by LaunchRiot');if(m.flag)r.push('looks like it needs a reply');if(m.unread)r.push('unread');if(m.cc)r.push('you are on CC');m.reasons.slice(0,3).forEach(x=>r.push(x));return r.length?r.join('; '):'no flag recorded'}
 // ---- load ----
 async function load(){S.err='';try{
- const st=await api('/status');S.conn=arr(st.connections?st:st);S.authed=true;
+ const st=await api('/status');S.conn=arr(st.connections?st:st);S.authed=true;S.rc={soon:st&&st.reconnect_due_soon===true,need:st&&st.reconnect_needed===true,by:st&&st.next_reconnect_by||null,url:safeUrl((S.conn.find(c=>c&&c.provider=='google')||{}).connect_url||'')};
  const con=S.conn.filter(c=>c.state=='connected');
  const MS={google:'gmail',microsoft:'outlook',zoho:'zoho_mail'};
  const soft=p=>api(p).catch(e=>{if(e.status==401)throw e;S.err='Some data could not be loaded ('+(e.status||'offline')+').';return null});
@@ -107,7 +107,10 @@ function render(){if(!S.authed){document.body.classList.add('locked');$('#nav').
  document.body.classList.remove('locked');const t=(location.hash.replace(/^#\/?/,'').split('/')[0])||'home',v=NAV.find(n=>n[0]==t)||NAV.find(n=>n[0]=='home')||NAV[0];
  $('#nav').innerHTML=`<a href="#/home" class="${v[0]=='home'?'on':''}" ${v[0]=='home'?'aria-current="page"':''}>Home</a>`;
  $('#who').innerHTML=`${S.user?esc(S.user)+' ':''}<button class="btn alt sm" data-act="logout">Sign out</button>`;
- $('#main').innerHTML=v[2]()+moreNav(v[0])}
+ $('#main').innerHTML=rcBanner()+v[2]()+moreNav(v[0])}
+// Google Testing-mode tokens drop 7 days after connecting; warn before it happens (data from /status).
+function rcBanner(){const r=S.rc;if(!r||!(r.soon||r.need))return '';const gone=r.need||(r.by&&new Date(r.by)<=new Date());const when=r.by?esc(dl(r.by))+', '+esc(tm(r.by))+' Dubai time':'soon';
+ return `<div class="notice" role="alert"><b>${gone?'Google needs reconnecting.':'Reconnect Google by '+when+'.'}</b> ${gone?'Mail and calendar have stopped syncing until you reconnect.':'Google drops the connection every 7 days while the app is in testing, and mail and calendar stop syncing after that.'} It takes one click and a Google sign-in. ${r.url?`<a class="btn sm" style="text-decoration:none" href="${esc(r.url)}">Reconnect Google</a>`:''}</div>`}
 function moreNav(cur){const L=NAV.filter(n=>n[0]!='home'&&n[0]!=cur);return `<details class="more-nav" id="morenav" ${S.moreOpen?'open':''}><summary>More</summary><div class="more-links">${L.map(n=>`<a href="#/${esc(n[0])}">${esc(n[1])}</a>`).join('')}<a href="https://drive.google.com/file/d/1NrbRN8bJYOD6847CmxC5q5E0Lzawg4JO/view?usp=drivesdk" target="_blank" rel="noopener">Executive demo video</a></div></details>`}
 document.addEventListener('toggle',ev=>{if(ev.target.id=='morenav')S.moreOpen=ev.target.open},true);
 function login(note){if($('#lg'))return;const d=document.createElement('div');d.className='modal';d.id='lg';
