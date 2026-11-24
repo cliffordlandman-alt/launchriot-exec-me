@@ -1,11 +1,11 @@
 // Home: what to do today, money coming in, target progress. All values come from clifford-api; untrusted text is escaped. No figures in this file except the agreed goal fallback.
 (function(){'use strict';const W=window.WN,{S,api,esc}=W;
-const FB={goal:20000,deadline:'2026-10-31'};
-S.pri=[];S.homeTab='now';S.tg=null;S.tgState='idle';S.money=[];S.moneyState='idle';
+S.pri=[];S.homeTab='now';S.tg=null;S.tgState='idle';S.money=[];S.moneyState='idle';S.wa=[];S.waState='idle';
 W.onLoad(async()=>{
- try{const r=await api('/target');S.tg=r&&typeof r=='object'?(r.target&&typeof r.target=='object'?r.target:r):null;S.tgState=S.tg?'live':'missing'}catch(e){if(e.status==401)throw e;S.tg=null;S.tgState='missing'}
- try{const r=await api('/priorities');S.pri=W.arr(r).filter(x=>x&&typeof x=='object'&&String(x.text||'').trim())}catch(e){if(e.status==401)throw e;S.pri=[]}
- try{const r=await api('/reports?area=money');S.money=W.arr(r).filter(x=>x&&typeof x=='object');S.moneyState='ok'}catch(e){if(e.status==401)throw e;S.money=[];S.moneyState='none'}});
+ try{const r=await api('/target');const raw=r&&typeof r=='object'?(r.target&&typeof r.target=='object'?r.target:(r.goal!=null||r.deadline?r:null)):null;S.tg=raw&&(raw.goal!=null||raw.deadline)?raw:null;S.tgState=S.tg?'live':'missing'}catch(e){if(e.status==401)throw e;S.tg=null;S.tgState='missing'}
+ try{const r=await api('/priorities');S.pri=W.arr(r).filter(x=>x&&typeof x=='object'&&String(x.text||'').trim()&&!x.archived_at)}catch(e){if(e.status==401)throw e;S.pri=[]}
+ try{const r=await api('/reports?area=money');S.money=W.arr(r).filter(x=>x&&typeof x=='object');S.moneyState='ok'}catch(e){if(e.status==401)throw e;S.money=[];S.moneyState='none'}
+ try{const r=await api('/wa-feed');S.wa=W.arr(r).filter(x=>x&&typeof x=='object'&&String(x.snippet||'').trim());S.waState='ok'}catch(e){if(e.status==401)throw e;S.wa=[];S.waState='none'}});
 const num=v=>{if(v===''||v==null)return null;const n=Number(v);return isFinite(n)?n:null};
 const aed=n=>'AED '+Math.round(n).toLocaleString('en-US');
 const dKey=v=>{if(!v)return '';const s=String(v);return /^\d{4}-\d\d-\d\d/.test(s)?s.slice(0,10):(isNaN(new Date(s))?'':W.dkey(s))};
@@ -17,7 +17,7 @@ const mine=t=>{const o=[t.owner].concat((t.assigned_staff||[]).map(a=>a&&(typeof
 const hasOwner=t=>!!(t.owner||(t.assigned_staff&&t.assigned_staff.length));
 function split(){const H=[],M=[],tk=W.todayK();
  const dueWhy=k=>!k?'':k<tk?'Overdue':k==tk?'Due today':'';
- (S.decisions||[]).filter(d=>d.status!='decided').forEach(d=>{const k=dKey(d.due),own=!d.owner||ME.test(String(d.owner)),w=dueWhy(k);
+ (S.decisions||[]).filter(d=>d.status!='decided'&&!d.archived_at).forEach(d=>{const k=dKey(d.due),own=!d.owner||ME.test(String(d.owner)),w=dueWhy(k);
   const it={k:'Decision',t:d.title||'(untitled)',due:k,p:1,go:'#/decisions'};
   if(own&&w){it.why=w+' · open decision in your register';H.push(it)}else{it.why=!own?'Owned by '+d.owner+', not you':k?'Not due yet':'No deadline set';M.push(it)}});
  (S.tasks||[]).filter(t=>t.status!='done'&&t.task_status!='closed').forEach(t=>{const k=dKey(t.due),w=dueWhy(k),it={k:'Task',t:t.title||t.subject||t.body_summary||t.snippet||'(untitled)',due:k,p:PR[t.priority]!=null?PR[t.priority]:1,go:'#/staff'};
@@ -37,9 +37,10 @@ function secPri(){const L=(S.pri||[]).slice().sort((a,b)=>(!!a.done-!!b.done)||(
 function secMoney(){const L=S.money.slice().sort((a,b)=>(+new Date(b.created_at)||0)-(+new Date(a.created_at)||0)).slice(0,4);
  return `<div class="card"><h2>Money coming in</h2>${L.length?L.map(x=>`<div class="item"><div class="t">${esc(x.headline||'')}</div>${x.detail?`<div class="why">${esc(x.detail)}</div>`:''}<div class="mut sm">Why am I seeing this? Money in · ${esc(x.agent||'')}${x.created_at&&!isNaN(new Date(x.created_at))?' · reported '+esc(W.dl(x.created_at)):''}</div></div>`).join(''):'<div class="empty">Not yet reported</div><div class="mut sm">Why am I seeing this? Money in is always shown</div>'}</div>`}
 function secTarget(){const live=S.tgState=='live'&&S.tg;
- const goal=(live&&num(S.tg.goal))||FB.goal,dl=(live&&S.tg.deadline&&dKey(S.tg.deadline))||FB.deadline;
- let earned=live?num(S.tg.earned):null,src=live?'from the target set by Chief':'fallback: goal and date as agreed, earned from collected deposits on your Status page; the target feed is not live yet';
- if(earned==null&&S.stLoaded&&S.st&&S.st.deposits_collected_aed&&typeof S.st.deposits_collected_aed.v=='number'){earned=S.st.deposits_collected_aed.v;if(live)src='goal from Chief; earned from collected deposits on Status'}
+ if(!live||num(S.tg.goal)==null||!dKey(S.tg.deadline))return '';
+ const goal=num(S.tg.goal),dl=dKey(S.tg.deadline);
+ let earned=num(S.tg.earned),src='from the target set by Chief';
+ if(earned==null&&S.stLoaded&&S.st&&S.st.deposits_collected_aed&&typeof S.st.deposits_collected_aed.v=='number'){earned=S.st.deposits_collected_aed.v;src='goal from Chief; earned from collected deposits on Status'}
  const a=W.todayK().split('-').map(Number),b=dl.split('-').map(Number),left=Math.round((Date.UTC(b[0],b[1]-1,b[2])-Date.UTC(a[0],a[1]-1,a[2]))/864e5);
  const pct=earned==null?0:Math.max(0,Math.min(100,Math.round(earned/goal*100)));
  const dtxt=new Intl.DateTimeFormat('en-GB',{timeZone:'UTC',day:'numeric',month:'long',year:'numeric'}).format(new Date(Date.UTC(b[0],b[1]-1,b[2])));
@@ -47,10 +48,15 @@ function secTarget(){const live=S.tgState=='live'&&S.tg;
  <div class="hbar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${pct}" aria-label="Progress to target"><i style="width:${pct}%"></i></div>
  <div class="stgrid" style="margin-top:12px"><div class="stcell"><div class="stl">Earned so far</div><div class="stv">${earned==null?'<span class="unsure">unsure</span>':earned===0?'<b>No verified payment yet</b>':'<b>'+esc(aed(earned))+'</b>'}</div></div><div class="stcell"><div class="stl">Left to earn</div><div class="stv">${earned==null?'<span class="unsure">unsure</span>':'<b>'+esc(aed(Math.max(goal-earned,0)))+'</b>'}</div></div><div class="stcell"><div class="stl">Days left (Dubai)</div><div class="stv"><b>${left>=0?left:'Deadline passed'}</b></div></div></div>
  ${live&&S.tg.note?`<p style="margin:8px 0 0"><b>Note:</b> ${esc(S.tg.note)}</p>`:''}<p class="mut sm" style="margin:8px 0 0">Source: ${esc(src)}.</p><p class="mut sm" style="margin:4px 0 0">Why am I seeing this? Target progress is always shown</p></div>`}
-function secNeed(){const {H}=split(),tk=W.todayK(),rep=H.filter(x=>x.k=='Needs you'),dec=(S.decisions||[]).filter(d=>d.status!='decided'&&(!d.owner||ME.test(String(d.owner)))).map(d=>({k:'Decision',t:d.title||'(untitled)',due:dKey(d.due),why:'Needs your decision · open in your Decisions register'})).sort((a,b)=>(a.due||'9')<(b.due||'9')?-1:(a.due||'9')>(b.due||'9')?1:0);
+function secNeed(){const {H}=split(),tk=W.todayK(),rep=H.filter(x=>x.k=='Needs you'),dec=(S.decisions||[]).filter(d=>d.status!='decided'&&!d.archived_at&&(!d.owner||ME.test(String(d.owner)))).map(d=>({k:'Decision',t:d.title||'(untitled)',due:dKey(d.due),why:'Needs your decision · open in your Decisions register'})).sort((a,b)=>(a.due||'9')<(b.due||'9')?-1:(a.due||'9')>(b.due||'9')?1:0);
  const L=rep.concat(dec),sh=L.slice(0,5);if(!L.length)return '';
  return `<div class="card" id="need"><h2>Needs your decision</h2>${sh.map(x=>itemHtml(x,tk)).join('')}${L.length>sh.length?`<p style="margin:12px 0 0"><a href="#/decisions">See all ${L.length} decisions</a></p>`:`<p style="margin:12px 0 0"><a href="#/decisions">Open Decisions</a></p>`}</div>`}
 function secToday(){const {H}=split(),tk=W.todayK(),L=H.filter(x=>x.k=='Task');if(!L.length)return '';return `<div class="card" id="today"><h2>Today</h2>${L.map(x=>itemHtml(x,tk)).join('')}</div>`}
-function view(){return `<h1>${esc(W.fmt(new Date().toISOString(),{weekday:'long',day:'numeric',month:'long'}))}</h1><p class="sub">Dubai time</p>${S.authed?'':W.needAuth()}${S.authed&&S.err?`<div class="notice">${esc(S.err)}</div>`:''}${S.authed?secPri()+secNeed()+secToday()+secMoney()+secTarget()+(W.homeCompanies?W.homeCompanies():'')+(W.homeProps?W.homeProps():'')+(W.homeGoLive?W.homeGoLive():''):''}`}
+function topicLabel(t){return ({money:'Money',work:'Work',properties:'Properties'}[t]||t)}
+function secWa(){const L=S.wa||[];
+ if(S.waState=='none'&&!L.length)return '';
+ if(!L.length)return `<div class="card" id="wa"><h2>From WhatsApp</h2><div class="empty">Nothing about money, work, or properties in the last 30 days.</div><p class="mut sm" style="margin:8px 0 0">Only payments, invoices, rent, payouts, LaunchRiot / YallaPMS / co-host work, and bookings, guests, tenants, units or maintenance are shown. Personal messages, chit-chat, OTPs and promos are left out.</p></div>`;
+ return `<div class="card" id="wa"><h2>From WhatsApp</h2>${L.map(x=>{const ts=x.at&&!isNaN(new Date(x.at))?esc(W.dl(x.at)+' '+W.tm(x.at)):'';const tops=(Array.isArray(x.topics)?x.topics:[x.topic]).filter(Boolean);return `<div class="item"><div class="t">${esc(x.chat_name||'WhatsApp chat')} ${tops.map(t=>`<span class="pill">${esc(topicLabel(t))}</span>`).join(' ')}</div>${x.snippet?`<div class="why">${esc(x.snippet)}</div>`:''}<div class="mut sm">${ts?ts+' · ':''}Picked up because it is about ${esc(tops.map(topicLabel).join(', ')||'work')}</div></div>`}).join('')}<p class="mut sm" style="margin:8px 0 0">Only money, work, and properties or rentals. Nothing else is picked up from WhatsApp.</p></div>`}
+function view(){return `<h1>${esc(W.fmt(new Date().toISOString(),{weekday:'long',day:'numeric',month:'long'}))}</h1><p class="sub">Dubai time</p>${S.authed?'':W.needAuth()}${S.authed&&S.err?`<div class="notice">${esc(S.err)}</div>`:''}${S.authed?secPri()+secNeed()+secWa()+secToday()+secMoney()+secTarget()+(W.homeCompanies?W.homeCompanies():'')+(W.homeProps?W.homeProps():'')+(W.homeGoLive?W.homeGoLive():''):''}`}
 W.view('home','Home',view,'status');
 })();
