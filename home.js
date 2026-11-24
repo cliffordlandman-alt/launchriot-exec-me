@@ -1,11 +1,12 @@
 // Home: what to do today, money coming in, target progress. All values come from clifford-api; untrusted text is escaped. No figures in this file except the agreed goal fallback.
 (function(){'use strict';const W=window.WN,{S,api,esc}=W;
-S.pri=[];S.homeTab='now';S.tg=null;S.tgState='idle';S.money=[];S.moneyState='idle';S.wa=[];S.waState='idle';
+S.pri=[];S.homeTab='now';S.tg=null;S.tgState='idle';S.money=[];S.moneyState='idle';S.wa=[];S.waState='idle';S.board={clifford:[],bots:{}};
 W.onLoad(async()=>{
  try{const r=await api('/target');const raw=r&&typeof r=='object'?(r.target&&typeof r.target=='object'?r.target:(r.goal!=null||r.deadline?r:null)):null;S.tg=raw&&(raw.goal!=null||raw.deadline)?raw:null;S.tgState=S.tg?'live':'missing'}catch(e){if(e.status==401)throw e;S.tg=null;S.tgState='missing'}
  try{const r=await api('/priorities');S.pri=W.arr(r).filter(x=>x&&typeof x=='object'&&String(x.text||'').trim()&&!x.archived_at)}catch(e){if(e.status==401)throw e;S.pri=[]}
  try{const r=await api('/reports?area=money');S.money=W.arr(r).filter(x=>x&&typeof x=='object');S.moneyState='ok'}catch(e){if(e.status==401)throw e;S.money=[];S.moneyState='none'}
- try{const r=await api('/wa-feed');S.wa=W.arr(r).filter(x=>x&&typeof x=='object'&&String(x.snippet||'').trim());S.waState='ok'}catch(e){if(e.status==401)throw e;S.wa=[];S.waState='none'}});
+ try{const r=await api('/wa-feed');S.wa=W.arr(r).filter(x=>x&&typeof x=='object'&&String(x.snippet||'').trim());S.waState='ok'}catch(e){if(e.status==401)throw e;S.wa=[];S.waState='none'}
+ try{const r=await api('/route-board');S.board=r&&typeof r=='object'?{clifford:W.arr(r.clifford),bots:r.bots&&typeof r.bots=='object'?r.bots:{}}:S.board}catch(e){if(e.status==401)throw e}});
 const num=v=>{if(v===''||v==null)return null;const n=Number(v);return isFinite(n)?n:null};
 const aed=n=>'AED '+Math.round(n).toLocaleString('en-US');
 const dKey=v=>{if(!v)return '';const s=String(v);return /^\d{4}-\d\d-\d\d/.test(s)?s.slice(0,10):(isNaN(new Date(s))?'':W.dkey(s))};
@@ -48,15 +49,27 @@ function secTarget(){const live=S.tgState=='live'&&S.tg;
  <div class="hbar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${pct}" aria-label="Progress to target"><i style="width:${pct}%"></i></div>
  <div class="stgrid" style="margin-top:12px"><div class="stcell"><div class="stl">Earned so far</div><div class="stv">${earned==null?'<span class="unsure">unsure</span>':earned===0?'<b>No verified payment yet</b>':'<b>'+esc(aed(earned))+'</b>'}</div></div><div class="stcell"><div class="stl">Left to earn</div><div class="stv">${earned==null?'<span class="unsure">unsure</span>':'<b>'+esc(aed(Math.max(goal-earned,0)))+'</b>'}</div></div><div class="stcell"><div class="stl">Days left (Dubai)</div><div class="stv"><b>${left>=0?left:'Deadline passed'}</b></div></div></div>
  ${live&&S.tg.note?`<p style="margin:8px 0 0"><b>Note:</b> ${esc(S.tg.note)}</p>`:''}<p class="mut sm" style="margin:8px 0 0">Source: ${esc(src)}.</p><p class="mut sm" style="margin:4px 0 0">Why am I seeing this? Target progress is always shown</p></div>`}
-function secNeed(){const {H}=split(),tk=W.todayK(),rep=H.filter(x=>x.k=='Needs you'),dec=(S.decisions||[]).filter(d=>d.status!='decided'&&!d.archived_at&&(!d.owner||ME.test(String(d.owner)))).map(d=>({k:'Decision',t:d.title||'(untitled)',due:dKey(d.due),why:'Needs your decision · open in your Decisions register'})).sort((a,b)=>(a.due||'9')<(b.due||'9')?-1:(a.due||'9')>(b.due||'9')?1:0);
- const L=rep.concat(dec),sh=L.slice(0,5);if(!L.length)return '';
- return `<div class="card" id="need"><h2>Needs your decision</h2>${sh.map(x=>itemHtml(x,tk)).join('')}${L.length>sh.length?`<p style="margin:12px 0 0"><a href="#/decisions">See all ${L.length} decisions</a></p>`:`<p style="margin:12px 0 0"><a href="#/decisions">Open Decisions</a></p>`}</div>`}
+function boardClifford(){return (S.board&&S.board.clifford)||[]}
+function boardBots(){return (S.board&&S.board.bots)||{}}
+function routeItemHtml(x){const tk=W.todayK();const due=dKey(x.at||x.due);const kind=x.kind||(x.source==='whatsapp'?'WhatsApp':'Needs you');
+ return `<div class="item"><div class="t"><span class="pill warn">${esc(kind)}</span>${esc(x.title||'(untitled)')}</div>${x.detail?`<div class="why">${esc(x.detail)}</div>`:''}<div class="mut sm">Why am I seeing this? ${esc(x.why||'This needs a decision only you can make.')}${due?' · '+esc(W.dl((due)+'T12:00:00+04:00')):''}</div></div>`}
+function secNeed(){const L=boardClifford();
+ if(!L.length)return `<div class="card" id="need"><h2>Needs your decision</h2><div class="empty">Nothing here needs you right now. Marketing, properties, finance and the rest are with the bots below.</div></div>`;
+ return `<div class="card" id="need"><h2>Needs your decision</h2><p class="mut sm" style="margin:0 0 10px">Only things only you can do: money approvals, signing or legal, pricing, and sign-in steps such as reconnecting Gmail. Everything else is with the responsible bot.</p>${L.map(routeItemHtml).join('')}</div>`}
+function botItemHtml(x){const kind=x.kind||'Item';
+ return `<div class="item"><div class="t"><span class="pill">${esc(kind)}</span>${esc(x.title||'(untitled)')}</div>${x.detail?`<div class="why">${esc(x.detail)}</div>`:''}<div class="mut sm">${esc(x.why||('Assigned to '+(x.owner||'the team')+'.'))}</div></div>`}
+function secTeam(){const bots=boardBots(),order=['Ron','Raju','Jayson','Fatima','Khalid','Sara YS'];
+ const blocks=order.map(name=>{const items=(bots[name]||[]).filter(x=>x&&typeof x=='object');
+  if(!items.length)return '';
+  return `<h3 style="margin:14px 0 6px">With ${esc(name)} (${items.length})</h3>${items.map(botItemHtml).join('')}`}).join('');
+ const n=order.reduce((a,k)=>a+((bots[k]||[]).length),0);
+ return `<div class="card" id="team"><h2>More · with the bots</h2><p class="mut sm" style="margin:0 0 10px">Routed in this workspace only. Nobody has been messaged. ${n?n+' item'+(n===1?'':'s')+' assigned.':'Nothing assigned yet.'}</p>${blocks||'<div class="empty">Nothing is with the bots yet.</div>'}<p style="margin:12px 0 0"><a href="#/business">Business view</a> · <a href="#/decisions">Decisions</a></p></div>`}
 function secToday(){const {H}=split(),tk=W.todayK(),L=H.filter(x=>x.k=='Task');if(!L.length)return '';return `<div class="card" id="today"><h2>Today</h2>${L.map(x=>itemHtml(x,tk)).join('')}</div>`}
 function topicLabel(t){return ({money:'Money',work:'Work',properties:'Properties'}[t]||t)}
 function secWa(){const L=S.wa||[];
  if(S.waState=='none'&&!L.length)return '';
  if(!L.length)return `<div class="card" id="wa"><h2>From WhatsApp</h2><div class="empty">Nothing about money, work, or properties in the last 30 days.</div><p class="mut sm" style="margin:8px 0 0">Only payments, invoices, rent, payouts, LaunchRiot / YallaPMS / co-host work, and bookings, guests, tenants, units or maintenance are shown. Personal messages, chit-chat, OTPs and promos are left out.</p></div>`;
  return `<div class="card" id="wa"><h2>From WhatsApp</h2>${L.map(x=>{const ts=x.at&&!isNaN(new Date(x.at))?esc(W.dl(x.at)+' '+W.tm(x.at)):'';const tops=(Array.isArray(x.topics)?x.topics:[x.topic]).filter(Boolean);return `<div class="item"><div class="t">${esc(x.chat_name||'WhatsApp chat')} ${tops.map(t=>`<span class="pill">${esc(topicLabel(t))}</span>`).join(' ')}</div>${x.snippet?`<div class="why">${esc(x.snippet)}</div>`:''}<div class="mut sm">${ts?ts+' · ':''}Picked up because it is about ${esc(tops.map(topicLabel).join(', ')||'work')}</div></div>`}).join('')}<p class="mut sm" style="margin:8px 0 0">Only money, work, and properties or rentals. Nothing else is picked up from WhatsApp.</p></div>`}
-function view(){return `<h1>${esc(W.fmt(new Date().toISOString(),{weekday:'long',day:'numeric',month:'long'}))}</h1><p class="sub">Dubai time</p>${S.authed?'':W.needAuth()}${S.authed&&S.err?`<div class="notice">${esc(S.err)}</div>`:''}${S.authed?secPri()+secNeed()+secWa()+secToday()+secMoney()+secTarget()+(W.homeCompanies?W.homeCompanies():'')+(W.homeProps?W.homeProps():'')+(W.homeGoLive?W.homeGoLive():''):''}`}
+function view(){return `<h1>${esc(W.fmt(new Date().toISOString(),{weekday:'long',day:'numeric',month:'long'}))}</h1><p class="sub">Dubai time</p>${S.authed?'':W.needAuth()}${S.authed&&S.err?`<div class="notice">${esc(S.err)}</div>`:''}${S.authed?secPri()+secNeed()+secToday()+secMoney()+secTarget()+(W.homeCompanies?W.homeCompanies():'')+(W.homeProps?W.homeProps():'')+(W.homeGoLive?W.homeGoLive():'')+secTeam():''}`}
 W.view('home','Home',view,'status');
 })();
